@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 import mysql.connector
 import os
@@ -63,6 +64,18 @@ def get_recibos(socio_id):
     } for r in rows]
 
     return jsonify(recibos)
+
+@app.route("/valor_unit", methods=["GET"])
+def get_valor_unit():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return jsonify({"valor_unit": float(row[0])})
+    return jsonify({"error": "Não encontrado"}), 404
 
 if __name__ == "__main__":
     app.run(debug=True)
