@@ -1,0 +1,31 @@
+<LoginScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 40
+        spacing: 20
+
+        Image:
+            id: img_logo
+            source: 'https://aquemrenasce.pt/imagens/000.png'
+            size_hint_y: 0.3
+
+        TextInput:
+            id: txt_user
+            hint_text: "Usuário"
+            multiline: False
+
+        TextInput:
+            id: txt_password
+            hint_text: "Senha"
+            password: True
+            multiline: False
+
+        Label:
+            id: lbl_status
+            text: ""
+            color: 1,0,0,1
+            font_size: 14
+
+        Button:
+            text: "Entrar"
+            on_press: root.check_login()

@@ -1,0 +1,80 @@
+<ReciboItem@BoxLayout>:
+    data: ''
+    tipo: ''
+    valor: ''
+    comentario: ''
+    orientation: "horizontal"
+    spacing: 10
+    padding: 5
+    size_hint_y: None
+    height: 30
+
+    Label:
+        text: root.data
+        font_size: 12
+        size_hint_x: 0.2
+    Label:
+        text: root.tipo
+        font_size: 12
+        size_hint_x: 0.3
+    Label:
+        text: root.valor
+        font_size: 12
+        size_hint_x: 0.2
+    Label:
+        text: root.comentario
+        font_size: 12
+        size_hint_x: 0.3
+
+<MainScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 10
+
+        Label:
+            text: "Ficha do Utente: " + root.nome
+            font_size: 22
+            size_hint_y: None
+            height: 40
+
+        Image:
+            id: img_foto
+            size_hint_y: 0.3
+            allow_stretch: True
+            keep_ratio: True
+
+        BoxLayout:
+            size_hint_y: None
+            height: 40
+            spacing: 20
+
+            Label:
+                text: "Meses em dívida: " + root.meses_em_divida
+
+            Label:
+                text: "Total a pagar: " + root.total_quota + " €"
+
+        Button:
+            text: "Imprimir Ficha PDF"
+            size_hint_y: None
+            height: 40
+            on_press: root.imprimir_ficha_pdf()
+
+        Label:
+            text: "Recibos:"
+            font_size: 16
+            size_hint_y: None
+            height: 30
+
+        RecycleView:
+            id: rv
+            viewclass: "ReciboItem"
+            data: root.recibos
+
+            RecycleBoxLayout:
+                orientation: 'vertical'
+                default_size: None, dp(40)
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height
