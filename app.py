@@ -82,7 +82,7 @@ def get_valor_unit():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT valor FROM tbl_tipo WHERE id = 1")
+        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
         row = cursor.fetchone()
         conn.close()
 
@@ -112,7 +112,7 @@ def gerar_pdf(id):
         hoje = datetime.date.today()
         meses_em_divida = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
 
-        cursor.execute("SELECT valor FROM tbl_tipo WHERE id = 1")
+        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
         row = cursor.fetchone()
         valor_unit = float(row[0]) if row else 0.0
         total = meses_em_divida * valor_unit
