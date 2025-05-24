@@ -17,35 +17,93 @@ def get_db():
         port=int(os.environ.get("DB_PORT", 3306))
     )
 
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    socionum = data.get("user", "").upper()
+    passwd = data.get("password")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nivel FROM tbl_user WHERE UPPER(socionum) = %s AND passatual = %s", (socionum, passwd))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return jsonify({"status": "ok", "nivel": row[0]})
+    return jsonify({"status": "error", "msg": "Credenciais inválidas"})
+
+@app.route("/utentes/<id>", methods=["GET"])
+def get_utente(id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome, ultquota, foto FROM tbl_utentes WHERE id = %s", (id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return jsonify({"nome": row[0], "ultquota": str(row[1]), "foto": row[2]})
+    return jsonify({"error": "Utente não encontrado"})
+
+@app.route("/recibos/<socio_id>", methods=["GET"])
+def get_recibos(socio_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
+        FROM tbl_recibodet rd
+        LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+        WHERE rd.socio = %s
+        ORDER BY rd.data_recibo_det DESC
+    """, (socio_id,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    recibos = [{
+        "data": str(r[0]),
+        "tipo": r[1],
+        "valor": f"{r[2]:.2f}",
+        "comentario": r[3] or ""
+    } for r in rows]
+
+    return jsonify(recibos)
+
+@app.route("/valor_unit", methods=["GET"])
+def get_valor_unit():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT valor FROM tbl_tipo WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return jsonify({"valor_unit": float(row[0])})
+    return jsonify({"error": "Não encontrado"}), 404
+
 @app.route("/ficha/<id>", methods=["GET"])
 def gerar_pdf(id):
     conn = get_db()
     cursor = conn.cursor()
 
-    # 1. Buscar dados do utente
     cursor.execute("SELECT nome, ultquota FROM tbl_utentes WHERE id = %s", (id,))
     utente = cursor.fetchone()
     if not utente:
         return jsonify({"erro": "Utente não encontrado"}), 404
 
     nome, ultquota = utente
-    if not ultquota:
+    if not ultquota or str(ultquota).strip() == "":
         ultquota = datetime.date(2007, 1, 1)
     else:
         ultquota = datetime.datetime.strptime(str(ultquota), "%Y-%m-%d").date()
 
-    # 2. Calcular meses em dívida
     hoje = datetime.date.today()
     meses_em_divida = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
 
-    # 3. Buscar valor_unit
     cursor.execute("SELECT valor FROM tbl_tipo WHERE id = 1")
     tipo_row = cursor.fetchone()
     valor_unit = tipo_row[0] if tipo_row else 0.0
-
     total = valor_unit * meses_em_divida
 
-    # 4. Buscar recibos
     cursor.execute("""
         SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
         FROM tbl_recibodet rd
@@ -56,7 +114,6 @@ def gerar_pdf(id):
     recibos = cursor.fetchall()
     conn.close()
 
-    # 5. Criar PDF
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -86,5 +143,7 @@ def gerar_pdf(id):
     pdf.save()
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True, download_name="ficha.pdf", mimetype="application/pdf")
+    return send_file(buffer, as_attachment=True, download_name=f"ficha_{id}.pdf", mimetype="application/pdf")
 
+if __name__ == "__main__":
+    app.run(debug=True)
