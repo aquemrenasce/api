@@ -87,3 +87,4 @@ def gerar_pdf(id):
     buffer.seek(0)
 
     return send_file(buffer, as_attachment=True, download_name="ficha.pdf", mimetype="application/pdf")
+
