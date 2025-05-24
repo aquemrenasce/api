@@ -42,8 +42,12 @@ def get_utente(id):
     conn.close()
 
     if row:
-        return jsonify({"nome": row[0], "ultquota": str(row[1]), "foto": row[2]})
-    return jsonify({"error": "Utente não encontrado"})
+        return jsonify({
+            "nome": row[0],
+            "ultquota": str(row[1]) if row[1] else "",
+            "foto": row[2]
+        })
+    return jsonify({"error": "Utente não encontrado"}), 404
 
 @app.route("/recibos/<socio_id>", methods=["GET"])
 def get_recibos(socio_id):
@@ -59,12 +63,12 @@ def get_recibos(socio_id):
     rows = cursor.fetchall()
     conn.close()
 
-    recibos = [{
-        "data": str(r[0]),
-        "tipo": r[1],
-        "valor": f"{r[2]:.2f}",
-        "comentario": r[3] or ""
-    } for r in rows]
+    recibos = [dict(
+        data=str(r[0]),
+        tipo=r[1],
+        valor=f"{r[2]:.2f}",
+        comentario=r[3] or ""
+    ) for r in rows]
 
     return jsonify(recibos)
 
@@ -91,18 +95,21 @@ def gerar_pdf(id):
         return jsonify({"erro": "Utente não encontrado"}), 404
 
     nome, ultquota = utente
-    if not ultquota or str(ultquota).strip() == "":
-        ultquota = datetime.date(2007, 1, 1)
-    else:
-        ultquota = datetime.datetime.strptime(str(ultquota), "%Y-%m-%d").date()
+
+    # Trata a data da última quota
+    try:
+        ultquota_date = datetime.datetime.strptime(str(ultquota), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        ultquota_date = datetime.date(2007, 1, 1)
 
     hoje = datetime.date.today()
-    meses_em_divida = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
+    meses_em_divida = max((hoje.year - ultquota_date.year) * 12 + (hoje.month - ultquota_date.month), 0)
 
     cursor.execute("SELECT valor FROM tbl_tipo WHERE id = 1")
-    tipo_row = cursor.fetchone()
-    valor_unit = tipo_row[0] if tipo_row else 0.0
-    total = valor_unit * meses_em_divida
+    valor_row = cursor.fetchone()
+    valor_unit = valor_row[0] if valor_row else 0.0
+
+    total = meses_em_divida * valor_unit
 
     cursor.execute("""
         SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
@@ -114,6 +121,7 @@ def gerar_pdf(id):
     recibos = cursor.fetchall()
     conn.close()
 
+    # Gerar PDF
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -122,7 +130,7 @@ def gerar_pdf(id):
     pdf.drawString(50, height - 50, f"Ficha do Utente: {nome}")
 
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, height - 80, f"Última Quota: {ultquota}")
+    pdf.drawString(50, height - 80, f"Última Quota: {ultquota_date}")
     pdf.drawString(50, height - 100, f"Meses em Dívida: {meses_em_divida}")
     pdf.drawString(50, height - 120, f"Total a Pagar: {total:.2f} €")
 
@@ -143,7 +151,8 @@ def gerar_pdf(id):
     pdf.save()
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True, download_name=f"ficha_{id}.pdf", mimetype="application/pdf")
+    return send_file(buffer, as_attachment=True, download_name="ficha.pdf", mimetype="application/pdf")
 
 if __name__ == "__main__":
     app.run(debug=True)
+
