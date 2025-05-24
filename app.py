@@ -2,6 +2,9 @@
 from flask import Flask, request, jsonify
 import mysql.connector
 import os
+from flask import send_file
+import io
+from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
 
@@ -79,3 +82,44 @@ def get_valor_unit():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+@app.route("/ficha/<socio_id>", methods=["GET"])
+def gerar_ficha(socio_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT nome, ultquota FROM tbl_utentes WHERE id = %s", (socio_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "Utente não encontrado"}), 404
+
+    nome, ultquota = row
+
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer)
+    p.drawString(100, 800, f"Ficha do Utente {socio_id}")
+    p.drawString(100, 770, f"Nome: {nome}")
+    p.drawString(100, 750, f"Última quota: {ultquota}")
+    p.drawString(100, 730, "Recibos:")
+
+    cursor.execute("""
+        SELECT rd.data_recibo_det, tt.tipo, rd.subtotal
+        FROM tbl_recibodet rd
+        LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+        WHERE rd.socio = %s
+        ORDER BY rd.data_recibo_det DESC
+    """, (socio_id,))
+    rows = cursor.fetchall()
+
+    y = 710
+    for r in rows:
+        data, tipo, valor = r
+        p.drawString(100, y, f"{data} - {tipo} - {valor:.2f} €")
+        y -= 20
+        if y < 50:
+            p.showPage()
+            y = 800
+
+    p.save()
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f"ficha_{socio_id}.pdf", mimetype="application/pdf")
