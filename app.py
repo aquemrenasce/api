@@ -91,35 +91,6 @@ def get_valor_unit():
         return jsonify({"error": "Não encontrado"}), 404
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
-    
-
-@app.route("/pendentes/<socio_id>", methods=["GET"])
-def listar_pendentes(socio_id):
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
-            FROM tbl_recibodet rd
-            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
-            WHERE rd.socio = %s AND rd.subtotal > rd.vpago
-            ORDER BY rd.data_recibo_det DESC
-        """, (socio_id,))
-        rows = cursor.fetchall()
-        conn.close()
-
-        pendentes = [{
-            "data": str(r[0]),
-            "tipo": r[1],
-            "valor": f"{r[2]:.2f}",
-            "vpago": f"{r[3]:.2f}",
-            "comentario": r[4] or ""
-        } for r in rows]
-
-        return jsonify(pendentes)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
 
 @app.route("/ficha/<id>", methods=["GET"])
 def gerar_pdf(id):
@@ -189,7 +160,9 @@ def gerar_pdf(id):
     except Exception as e:
         print("Erro ao gerar PDF:", e)
         return jsonify({"erro": str(e)}), 500
-        
+
+
+
 @app.route("/recibos_pendentes/<socio_id>", methods=["GET"])
 def get_recibos_pendentes(socio_id):
     try:
