@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 import os
 from io import BytesIO
-from reportlab.pdfgen import canvas
+#from reportlab.pdfgen import canvas
 #from reportlab.lib.pagesizes import A4
 import datetime
 
@@ -92,73 +92,58 @@ def get_valor_unit():
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-@app.route("/ficha/<id>", methods=["GET"])
-def gerar_pdf(id):
+@app.route("/quotas/<socio_id>", methods=["GET"])
+def get_quotas(socio_id):
     try:
         conn = get_db()
         cursor = conn.cursor()
-
-        cursor.execute("SELECT nome, ultquota FROM tbl_utentes WHERE id = %s", (id,))
-        utente = cursor.fetchone()
-        if not utente:
-            return jsonify({"erro": "Utente não encontrado"}), 404
-
-        nome, ultquota = utente
-        if not ultquota:
-            ultquota = datetime.date(2007, 1, 1)
-        else:
-            ultquota = datetime.datetime.strptime(str(ultquota), "%Y-%m-%d").date()
-
-        hoje = datetime.date.today()
-        meses_em_divida = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
-
-        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
-        row = cursor.fetchone()
-        valor_unit = float(row[0]) if row else 0.0
-        total = meses_em_divida * valor_unit
-
         cursor.execute("""
             SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
             FROM tbl_recibodet rd
             LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
-            WHERE rd.socio = %s
+            WHERE rd.socio = %s AND rd.tipo = 1
             ORDER BY rd.data_recibo_det DESC
-        """, (id,))
-        recibos = cursor.fetchall()
+        """, (socio_id,))
+        rows = cursor.fetchall()
         conn.close()
 
-        buffer = BytesIO()
-        pdf = canvas.Canvas(buffer, pagesize = A4)
-        width, height = A4
+        quotas = [{
+            "data": str(r[0]),
+            "tipo": r[1],
+            "valor": f"{r[2]:.2f}",
+            "comentario": r[3] or ""
+        } for r in rows]
 
-        pdf.setFont("Helvetica-Bold", 16)
-        pdf.drawString(50, height - 50, f"Ficha do Utente: {nome}") 
-
-        pdf.setFont("Helvetica", 12)
-        pdf.drawString(50, height - 80, f"Última Quota: {ultquota}")
-        pdf.drawString(50, height - 100, f"Meses em Dívida: {meses_em_divida}")
-        pdf.drawString(50, height - 120, f"Total a Pagar: {total:.2f} €")
-
-        y = height - 160
-        pdf.setFont("Helvetica-Bold", 12)
-        pdf.drawString(50, y, "Recibos:")
-        y -= 20
-
-        pdf.setFont("Helvetica", 10)
-        for r in recibos:
-            linha = f"{r[0]} | {r[1]} | {r[2]:.2f} € | {r[3] or ''}"
-            pdf.drawString(50, y, linha)
-            y -= 15
-            if y < 50:
-                pdf.showPage()
-                y = height - 50
-
-        pdf.save()
-        buffer.seek(0)
-        return send_file(buffer, as_attachment=True, download_name="ficha.pdf", mimetype="application/pdf")
-
+        return jsonify(quotas)
     except Exception as e:
-        print("Erro ao gerar PDF:", e)
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/recibos_pendentes/<socio_id>", methods=["GET"])
+def get_recibos_pendentes(socio_id):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
+            FROM tbl_recibodet rd
+            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+            WHERE rd.socio = %s AND rd.subtotal > rd.vpago
+            ORDER BY rd.data_recibo_det DESC
+        """, (socio_id,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        recibos = [{
+            "data": str(r[0]),
+            "tipo": r[1],
+            "subtotal": f"{r[2]:.2f}",
+            "vpago": f"{r[3]:.2f}",
+            "comentario": r[4] or ""
+        } for r in rows]
+
+        return jsonify(recibos)
+    except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 if __name__ == "__main__":
