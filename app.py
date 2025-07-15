@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 import os
 from io import BytesIO
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+#from reportlab.pdfgen import canvas
+#from reportlab.lib.pagesizes import A4
 import datetime
 
 app = Flask(__name__)
@@ -72,7 +72,7 @@ def get_recibos(socio_id):
             "valor": f"{r[2]:.2f}",
             "comentario": r[3] or ""
         } for r in rows]
-
+        
         return jsonify(recibos)
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
