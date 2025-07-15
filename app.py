@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 import os
 from io import BytesIO
-#from reportlab.pdfgen import canvas
-#from reportlab.lib.pagesizes import A4
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.pagesizes import A4
 import datetime
 
 app = Flask(__name__)
@@ -16,6 +16,11 @@ def get_db():
         database=os.environ.get("DB_NAME", "aquemrenasce_ardb"),
         port=int(os.environ.get("DB_PORT", 3306))
     )
+
+# ✅ Rota raiz para health check
+@app.route("/", methods=["GET"])
+def index():
+    return jsonify({"status": "API Aquem Renasce ativa"}), 200
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -190,5 +195,6 @@ def gerar_pdf(id):
         print("Erro ao gerar PDF:", e)
         return jsonify({"erro": str(e)}), 500
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
