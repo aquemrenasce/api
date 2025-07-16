@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import mysql.connector
 import os
+from datetime import date, datetime
 
 app = Flask(__name__)
 
@@ -40,15 +41,43 @@ def get_utente(id):
     try:
         conn = get_db()
         cursor = conn.cursor()
+
+        # Buscar dados do utente
         cursor.execute("""
             SELECT nome, ultquota, foto FROM tbl_utentes WHERE id = %s
         """, (id,))
         row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return jsonify({"error": "Utente não encontrado"}), 404
+
+        nome, ultquota_str, foto = row
+
+        # Converter data última quota
+        ultquota = datetime.strptime(str(ultquota_str), "%Y-%m-%d").date()
+
+        # Calcular meses em falta
+        hoje = date.today()
+        meses_em_falta = (hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month)
+        meses_em_falta = max(meses_em_falta, 0)
+
+        # Buscar valor_unit da quota
+        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
+        valor_unit = cursor.fetchone()[0]
+
+        # Calcular total em dívida
+        total = meses_em_falta * valor_unit
+
         conn.close()
 
-        if row:
-            return jsonify({"nome": row[0], "ultquota": str(row[1]), "foto": row[2]})
-        return jsonify({"error": "Utente não encontrado"}), 404
+        return jsonify({
+            "nome": nome,
+            "ultquota": str(ultquota),
+            "foto": foto,
+            "meses_em_falta": meses_em_falta,
+            "total": round(total, 2)
+        })
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
@@ -58,10 +87,11 @@ def get_quotas(socio_id):
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
+            SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
             FROM tbl_recibodet rd
-            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+            JOIN tbl_tipo tt ON rd.tipo = tt.id
             WHERE rd.socio = %s AND rd.tipo = 1
+            GROUP BY rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
             ORDER BY rd.data_recibo_det DESC
         """, (socio_id,))
         rows = cursor.fetchall()
@@ -86,8 +116,9 @@ def get_recibos_pendentes(socio_id):
         cursor.execute("""
             SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
             FROM tbl_recibodet rd
-            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+            JOIN tbl_tipo tt ON rd.tipo = tt.id
             WHERE rd.socio = %s AND rd.subtotal > rd.vpago
+            GROUP BY rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
             ORDER BY rd.data_recibo_det DESC
         """, (socio_id,))
         rows = cursor.fetchall()
@@ -102,21 +133,6 @@ def get_recibos_pendentes(socio_id):
         } for r in rows]
 
         return jsonify(pendentes)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-@app.route("/valor_unit", methods=["GET"])
-def get_valor_unit():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            return jsonify({"valor_unit": float(row[0])})
-        return jsonify({"error": "Não encontrado"}), 404
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
