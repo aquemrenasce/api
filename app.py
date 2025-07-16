@@ -1,10 +1,6 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 import mysql.connector
 import os
-from io import BytesIO
-#from reportlab.pdfgen import canvas
-#from reportlab.lib.pagesizes import A4
-import datetime
 
 app = Flask(__name__)
 
@@ -51,47 +47,6 @@ def get_utente(id):
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-@app.route("/recibos/<socio_id>", methods=["GET"])
-def get_recibos(socio_id):
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
-            FROM tbl_recibodet rd
-            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
-            WHERE rd.socio = %s
-            ORDER BY rd.data_recibo_det DESC
-        """, (socio_id,))
-        rows = cursor.fetchall()
-        conn.close()
-
-        recibos = [{
-            "data": str(r[0]),
-            "tipo": r[1],
-            "valor": f"{r[2]:.2f}",
-            "comentario": r[3] or ""
-        } for r in rows]
-        
-        return jsonify(recibos)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-@app.route("/valor_unit", methods=["GET"])
-def get_valor_unit():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            return jsonify({"valor_unit": float(row[0])})
-        return jsonify({"error": "Não encontrado"}), 404
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
 @app.route("/quotas/<socio_id>", methods=["GET"])
 def get_quotas(socio_id):
     try:
@@ -118,7 +73,6 @@ def get_quotas(socio_id):
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-
 @app.route("/recibos_pendentes/<socio_id>", methods=["GET"])
 def get_recibos_pendentes(socio_id):
     try:
@@ -137,8 +91,7 @@ def get_recibos_pendentes(socio_id):
         recibos = [{
             "data": str(r[0]),
             "tipo": r[1],
-            "subtotal": f"{r[2]:.2f}",
-            "vpago": f"{r[3]:.2f}",
+            "valor": f"{r[2]:.2f} / {r[3]:.2f}",  # 👈 combina subtotal/vpago
             "comentario": r[4] or ""
         } for r in rows]
 
