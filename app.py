@@ -76,7 +76,7 @@ def get_quotas(socio_id):
     rows = cursor.fetchall()
     conn.close()
     quotas = [{
-        "data": str(r[0]),
+        "data": str(r[0])[:10],
         "tipo": r[1],
         "valor": f"{r[2]:.2f}",
         "comentario": r[3] or ""
@@ -97,7 +97,7 @@ def get_recibos_pendentes(socio_id):
     rows = cursor.fetchall()
     conn.close()
     pendentes = [{
-        "data": str(r[0]),
+        "data": str(r[0])[:10],
         "tipo": r[1],
         "subtotal": f"{r[2]:.2f}",
         "vpago": f"{r[3]:.2f}",
