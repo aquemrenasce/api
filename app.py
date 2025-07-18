@@ -35,23 +35,26 @@ def get_utente(id):
         cursor = conn.cursor()
         cursor.execute("SELECT nome, ultquota, foto FROM tbl_utentes WHERE id=%s", (id,))
         row = cursor.fetchone()
+        conn.close()
         if not row:
             return jsonify({"error": "Utente não encontrado"}), 404
 
         nome, ultquota, foto = row
         if not ultquota:
-            ultquota = datetime.date(2000, 1, 1)  # fallback
+            ultquota = datetime.date(2000, 1, 1)
         else:
             ultquota = datetime.datetime.strptime(str(ultquota), "%Y-%m-%d").date()
 
         hoje = datetime.date.today()
         meses_em_falta = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
 
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id=1")
         valor_unit = cursor.fetchone()[0] or 0
+        conn.close()
         total = meses_em_falta * float(valor_unit)
 
-        conn.close()
         return jsonify({
             "nome": nome,
             "ultquota": str(ultquota),
@@ -67,20 +70,20 @@ def get_quotas(socio_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT rd.data_recibo_det, tt.tipo, SUM(rd.subtotal), GROUP_CONCAT(rd.comentario SEPARATOR '; ')
+        SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
         FROM tbl_recibodet rd
         LEFT JOIN tbl_tipo tt ON rd.tipo=tt.id
         WHERE rd.socio=%s AND rd.tipo=1
-        GROUP BY rd.data_recibo_det, tt.tipo
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
     conn.close()
     quotas = [{
-        "data": str(r[0])[:10],
-        "tipo": r[1],
-        "valor": f"{r[2]:.2f}",
-        "comentario": r[3] or ""
+        "id": r[0],
+        "data": str(r[1])[:10],
+        "tipo": r[2],
+        "valor": f"{r[3]:.2f}",
+        "comentario": r[4] or ""
     } for r in rows]
     return jsonify(quotas)
 
@@ -89,21 +92,21 @@ def get_recibos_pendentes(socio_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT rd.data_recibo_det, tt.tipo, SUM(rd.subtotal), SUM(rd.vpago), GROUP_CONCAT(rd.comentario SEPARATOR '; ')
+        SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
         FROM tbl_recibodet rd
         LEFT JOIN tbl_tipo tt ON rd.tipo=tt.id
         WHERE rd.socio=%s AND rd.subtotal > rd.vpago
-        GROUP BY rd.data_recibo_det, tt.tipo
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
     conn.close()
     pendentes = [{
-        "data": str(r[0])[:10],
-        "tipo": r[1],
-        "subtotal": f"{r[2]:.2f}",
-        "vpago": f"{r[3]:.2f}",
-        "comentario": r[4] or ""
+        "id": r[0],
+        "data": str(r[1])[:10],
+        "tipo": r[2],
+        "subtotal": f"{r[3]:.2f}",
+        "vpago": f"{r[4]:.2f}",
+        "comentario": r[5] or ""
     } for r in rows]
     return jsonify(pendentes)
 
