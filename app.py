@@ -72,8 +72,8 @@ def get_quotas(socio_id):
     cursor.execute("""
         SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
         FROM tbl_recibodet rd
-        LEFT JOIN tbl_tipo tt ON rd.tipo=tt.id
-        WHERE rd.socio=%s AND rd.tipo=1
+        LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+        WHERE rd.socio = %s AND rd.tipo = 1  -- Apenas registos do tipo 1 (quota)
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
@@ -94,8 +94,8 @@ def get_recibos_pendentes(socio_id):
     cursor.execute("""
         SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
         FROM tbl_recibodet rd
-        LEFT JOIN tbl_tipo tt ON rd.tipo=tt.id
-        WHERE rd.socio=%s AND rd.subtotal > rd.vpago
+        LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+        WHERE rd.socio = %s AND rd.subtotal > rd.vpago  -- Apenas recibos onde subtotal > vpago
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
