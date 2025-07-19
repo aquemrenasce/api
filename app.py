@@ -35,8 +35,9 @@ def get_utente(id):
         cursor = conn.cursor()
         cursor.execute("SELECT nome, ultquota, foto FROM tbl_utentes WHERE id=%s", (id,))
         row = cursor.fetchone()
-        conn.close()
+
         if not row:
+            conn.close()
             return jsonify({"error": "Utente não encontrado"}), 404
 
         nome, ultquota, foto = row
@@ -48,19 +49,37 @@ def get_utente(id):
         hoje = datetime.date.today()
         meses_em_falta = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
 
-        conn = get_db()
-        cursor = conn.cursor()
         cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id=1")
         valor_unit = cursor.fetchone()[0] or 0
-        conn.close()
         total = meses_em_falta * float(valor_unit)
+
+        # 🔥 Trazer também as quotas
+        cursor.execute("""
+            SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
+            FROM tbl_recibodet rd
+            LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
+            WHERE rd.socio = %s AND rd.tipo = 1
+            ORDER BY rd.data_recibo_det DESC
+        """, (id,))
+        quotas_rows = cursor.fetchall()
+
+        quotas = [{
+            "id": r[0],
+            "data": str(r[1])[:10],
+            "tipo": r[2],
+            "valor": f"{r[3]:.2f}",
+            "comentario": r[4] or ""
+        } for r in quotas_rows]
+
+        conn.close()
 
         return jsonify({
             "nome": nome,
             "ultquota": str(ultquota),
             "foto": foto,
             "meses_em_falta": meses_em_falta,
-            "total": round(total, 2)
+            "total": round(total, 2),
+            "quotas": quotas  # 👈 Adicionar quotas na resposta
         })
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
