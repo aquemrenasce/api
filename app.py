@@ -33,9 +33,10 @@ def get_utente(id):
     try:
         conn = get_db()
         cursor = conn.cursor()
+
+        # Buscar dados do utente
         cursor.execute("SELECT nome, ultquota, foto FROM tbl_utentes WHERE id=%s", (id,))
         row = cursor.fetchone()
-
         if not row:
             conn.close()
             return jsonify({"error": "Utente não encontrado"}), 404
@@ -49,11 +50,12 @@ def get_utente(id):
         hoje = datetime.date.today()
         meses_em_falta = max((hoje.year - ultquota.year) * 12 + (hoje.month - ultquota.month), 0)
 
+        # Buscar valor unitário da quota
         cursor.execute("SELECT valor_unit FROM tbl_tipo WHERE id=1")
         valor_unit = cursor.fetchone()[0] or 0
         total = meses_em_falta * float(valor_unit)
 
-        # 🔥 Trazer também as quotas
+        # 🔥 Buscar as quotas do utente
         cursor.execute("""
             SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
             FROM tbl_recibodet rd
@@ -62,7 +64,6 @@ def get_utente(id):
             ORDER BY rd.data_recibo_det DESC
         """, (id,))
         quotas_rows = cursor.fetchall()
-
         quotas = [{
             "id": r[0],
             "data": str(r[1])[:10],
@@ -79,7 +80,7 @@ def get_utente(id):
             "foto": foto,
             "meses_em_falta": meses_em_falta,
             "total": round(total, 2),
-            "quotas": quotas  # 👈 Adicionar quotas na resposta
+            "quotas": quotas  # 👈 Adicionado ao JSON
         })
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
@@ -92,7 +93,7 @@ def get_quotas(socio_id):
         SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.comentario
         FROM tbl_recibodet rd
         LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
-        WHERE rd.socio = %s AND rd.tipo = 1  -- Apenas registos do tipo 1 (quota)
+        WHERE rd.socio = %s AND rd.tipo = 1
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
@@ -114,7 +115,7 @@ def get_recibos_pendentes(socio_id):
         SELECT rd.id, rd.data_recibo_det, tt.tipo, rd.subtotal, rd.vpago, rd.comentario
         FROM tbl_recibodet rd
         LEFT JOIN tbl_tipo tt ON rd.tipo = tt.id
-        WHERE rd.socio = %s AND rd.subtotal > rd.vpago  -- Apenas recibos onde subtotal > vpago
+        WHERE rd.socio = %s AND rd.subtotal > rd.vpago
         ORDER BY rd.data_recibo_det DESC
     """, (socio_id,))
     rows = cursor.fetchall()
